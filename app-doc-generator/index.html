@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>App Doc Generator — Case Study</title>
-<meta name="description" content="How I built an agent that documents Android apps by actually using them — accessibility-tree navigation, a pluggable three-engine architecture, and a content-anchored video pipeline.">
+<title>App Doc Generator: Case Study</title>
+<meta name="description" content="How I designed an agent that documents Android apps by actually using them, and built it with AI coding agents. It covers accessibility-tree navigation, a pluggable three-engine architecture, and a content-anchored video pipeline.">
 <style>
   :root {
     --bg: #fbfaf8;
@@ -161,6 +161,15 @@
   details.rough summary { cursor: pointer; font-weight: 600; font-size: 14.5px; color: var(--ink); }
   details.rough p { margin-top: 10px; margin-bottom: 0; }
 
+  .made { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 14px; padding: 22px 24px; margin: 0 0 8px; }
+  .made h2 { font-size: 19px; margin: 0 0 10px; }
+  .made p:last-child { margin-bottom: 0; }
+  .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+  .role { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .role b { display: block; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .role ul { margin: 0; padding-left: 18px; }
+  .role li { font-size: 14.5px; margin-bottom: 5px; }
+  @media (max-width: 600px) { .roles { grid-template-columns: 1fr; } }
   hr.div { border: none; border-top: 1px solid var(--line); margin: 44px 0; }
   footer { padding: 40px 0 60px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-3); }
 
@@ -178,12 +187,13 @@
   <div class="wrap">
     <p class="kicker">Case Study · Personal Project</p>
     <h1>App Doc Generator</h1>
-    <p class="subtitle">An agent that learns an Android app by actually tapping through it, then writes the help-center article itself, with screenshots and demo videos.</p>
+    <p class="subtitle">An agent that learns an Android app by actually tapping through it, then writes the help-center article itself, with screenshots and demo videos. I came up with the idea and the logic behind how it works, then built it by directing AI coding agents.</p>
     <div class="byline">
       <span class="avatar">A</span>
-      <span><strong>Aakamsha</strong> · designed, built and written up solo</span>
+      <span><strong>Aakamsha</strong> · product design and logic by me, code written with AI (Claude Code)</span>
     </div>
     <div class="chips">
+      <span class="chip">Built with AI coding agents</span>
       <span class="chip">Next.js + TypeScript</span>
       <span class="chip">Python · Appium</span>
       <span class="chip">Model Context Protocol</span>
@@ -194,6 +204,31 @@
 </header>
 
 <main class="wrap">
+
+  <section class="made">
+    <h2>How this was built</h2>
+    <p>I didn't write this code by hand. I built the whole tool with AI coding agents. My job was the thinking: what the tool should do, how each part should work, and what to change when the results weren't good enough. The agents turned those decisions into code.</p>
+    <div class="roles">
+      <div class="role">
+        <b>My part</b>
+        <ul>
+          <li>The idea: document an app by actually using it</li>
+          <li>The approach, like reading the screen's structure instead of guessing from pictures</li>
+          <li>The writing rules that make the docs read like a technical writer wrote them</li>
+          <li>Testing real runs, spotting what was wrong, and deciding how to fix it</li>
+        </ul>
+      </div>
+      <div class="role">
+        <b>The AI's part</b>
+        <ul>
+          <li>Writing the code for each part I described</li>
+          <li>Wiring up the libraries (phone control, video, database, web app)</li>
+          <li>Making the changes I asked for after each test</li>
+        </ul>
+      </div>
+    </div>
+    <p>The sections below go into technical detail. Read them as the decisions I made and why. The code that carries those decisions out was written by AI, following my direction.</p>
+  </section>
 
   <figure class="wide">
     <div class="shot"><img src="images/dashboard.png" width="1440" height="900" alt="App Doc Generator dashboard showing projects, published docs, recent runs with engine and cost, and connected devices"></div>
@@ -350,7 +385,7 @@
   <section>
     <h2>The core idea: read the tree, not the pixels</h2>
     <p>A lot of "AI controls an app" demos show a vision model a screenshot and ask it to guess pixel coordinates to tap. It looks great in a GIF and is unreliable in practice. Screen density varies across devices, a button moves eight pixels between versions, and estimating the exact center of a small icon from a picture is something vision models are still shaky at.</p>
-    <p>So this doesn't do that. Android exposes an accessibility tree for every screen, the same data screen readers use, and Appium can hand it over as XML. I parse it, drop everything that isn't visible, tappable or carrying meaningful text, and compact what's left into a short numbered list:</p>
+    <p>So this doesn't do that. Android exposes an accessibility tree for every screen, the same data screen readers use, and Appium can hand it over as XML. The tool parses it, drops everything that isn't visible, tappable or carrying meaningful text, and compacts what's left into a short numbered list:</p>
     <pre><code>[ 12] Button        "Save"          id=action_save   bounds=(900,80,1060,160) clickable
 [ 27] EditText      "Company"       id=company_input bounds=(80,320,1000,400) input
 [ 31] ImageView     ""              id=fab_add       bounds=(940,1780,1060,1900) clickable</code></pre>
@@ -362,7 +397,7 @@
   <section>
     <h2>One tool surface, three brains</h2>
     <p>The phone is controlled through a small local server that exposes tap, type_text, swipe, press_back, screenshot, begin_action/end_action for recording, and done as tools over the <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol</a>, on top of Appium. That server doesn't know or care which model is calling it.</p>
-    <p>There are three ways to drive it. The first is a TypeScript agent loop I wrote that talks straight to an Anthropic or OpenAI-compatible API with native tool calling, so anyone with an API key can use it. The other two spawn the Claude Code CLI or the GitHub Copilot CLI, which already speak MCP and bill through whatever subscription the person already has.</p>
+    <p>There are three ways to drive it. The first is a TypeScript agent loop built for this project that talks straight to an Anthropic or OpenAI-compatible API with native tool calling, so anyone with an API key can use it. The other two spawn the Claude Code CLI or the GitHub Copilot CLI, which already speak MCP and bill through whatever subscription the person already has.</p>
 
     <figure class="wide">
       <div class="shot-pair">
@@ -462,14 +497,14 @@
 
   <section>
     <h2>What building this taught me</h2>
-    <p>Going in, I assumed the hard part would be the agent: getting a model to navigate a UI it had never seen. That came together faster than I expected, mostly because reading the accessibility tree instead of guessing at pixels removes most of the fragility up front. What actually took the time was everything after "the agent found the right screen": writing prose that stays true a release later, and turning a recording full of hesitations and mistakes into something that looks intentional. Neither of those is a model-capability problem. They're editorial and engineering problems that happen to have an LLM in the middle, and treating them that way, with explicit rules, fallbacks and a human review step instead of blind trust in the automation, is what made the output usable.</p>
+    <p>Going in, I assumed the hard part would be the agent: getting a model to navigate a UI it had never seen. That came together faster than I expected, mostly because reading the accessibility tree instead of guessing at pixels removes most of the fragility up front. What actually took the time was everything after "the agent found the right screen": writing prose that stays true a release later, and turning a recording full of hesitations and mistakes into something that looks intentional. Neither of those is a model-capability problem. They're editorial and engineering problems that happen to have an LLM in the middle, and treating them that way, with explicit rules, fallbacks and a human review step instead of blind trust in the automation, is what made the output usable. It's also how I worked with the coding agents that built it: they wrote the code, and I judged every result against what the tool actually had to do.</p>
   </section>
 
 </main>
 
 <footer>
   <div class="wrap">
-    Written by Aakamsha. A personal project, built end to end, from the Android automation layer up to the documentation review UI.
+    Written by Aakamsha. A personal project, designed by me and built with AI coding agents, from the Android automation layer up to the documentation review UI.
   </div>
 </footer>
 
