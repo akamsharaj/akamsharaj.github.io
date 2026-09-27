@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Auto Video Creator — Case Study</title>
+<meta name="description" content="How I built a tool that turns a script or a voice recording into a narrated, animated video — with an agent that directs the scenes and a capture pipeline that times real screen recordings to the narration.">
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --bg-2: #f3f1ec;
+    --panel: #ffffff;
+    --ink: #1c1a17;
+    --ink-2: #4a453e;
+    --ink-3: #837c70;
+    --line: #e4e0d7;
+    --accent: #a24d2f;
+    --accent-soft: #f4e5dc;
+    --code-bg: #1e1c19;
+    --code-ink: #eee7dc;
+    --good: #3d6b4f;
+    --good-soft: #e4efe6;
+    --shadow: 0 1px 2px rgba(28,26,23,.06), 0 12px 32px -12px rgba(28,26,23,.22);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171512;
+      --bg-2: #1e1b17;
+      --panel: #211e19;
+      --ink: #ece7dd;
+      --ink-2: #c3bcae;
+      --ink-3: #8d8577;
+      --line: #35312a;
+      --accent: #e08a5f;
+      --accent-soft: #3a2a20;
+      --code-bg: #0f0e0c;
+      --code-ink: #e9e2d6;
+      --good: #7fbf94;
+      --good-soft: #1f2c22;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px -12px rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  img { max-width: 100%; height: auto; display: block; }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+  header.hero { padding: 72px 0 40px; }
+  .kicker { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 14px; }
+  .subtitle { font-size: 18px; color: var(--ink-2); max-width: 58ch; margin: 0 0 28px; }
+  .byline { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-3); }
+  .byline .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .byline strong { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 30px 0 0; }
+  .chip { font-size: 13px; padding: 7px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--ink-2); }
+
+  main { padding: 8px 0 20px; }
+  section { margin-bottom: 56px; }
+
+  h2 { font-size: 23px; letter-spacing: -0.005em; margin: 0 0 16px; padding-top: 4px; }
+  p { margin: 0 0 16px; color: var(--ink-2); font-size: 16px; }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+  a { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
+  ul { margin: 0 0 16px; padding-left: 22px; color: var(--ink-2); }
+  li { margin-bottom: 9px; font-size: 16px; }
+  li::marker { color: var(--ink-3); }
+  .lede { font-size: 18.5px; color: var(--ink); }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 20px 0; }
+  .card h4 { margin: 0 0 6px; font-size: 14.5px; color: var(--ink); }
+  .card p:last-child { margin-bottom: 0; }
+
+  code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+  code { background: var(--bg-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 5px; font-size: 0.87em; color: var(--ink); }
+  pre { background: var(--code-bg); color: var(--code-ink); padding: 18px 20px; border-radius: 12px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 18px 0; }
+  pre code { background: none; border: none; padding: 0; color: inherit; }
+  .caption, figcaption { font-size: 13px; color: var(--ink-3); line-height: 1.5; }
+  .caption { margin-top: -10px; margin-bottom: 20px; }
+
+  figure { margin: 30px 0 34px; }
+  figure.wide { width: min(1040px, calc(100vw - 40px)); position: relative; left: 50%; transform: translateX(-50%); }
+  .shot { border-radius: 12px; border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden; background: #0b0b0d; }
+  figcaption { margin-top: 12px; max-width: 720px; }
+  figure.wide figcaption { margin-left: auto; margin-right: auto; }
+
+  .arch { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 14px; }
+  .arch-scroll { overflow-x: auto; }
+  .arch svg { display: block; width: 100%; min-width: 620px; height: auto; }
+  .arch text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif; }
+  .dg-box { fill: var(--panel); stroke: var(--line); stroke-width: 1.3; }
+  .dg-group { fill: var(--bg-2); stroke: var(--line); stroke-width: 1.3; }
+  .dg-hl { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.3; }
+  .dg-t { fill: var(--ink); font-size: 14.5px; font-weight: 600; }
+  .dg-g { fill: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  .dg-s { fill: var(--ink-3); font-size: 11.5px; }
+  .dg-l { fill: var(--ink-3); font-size: 11.5px; font-style: italic; }
+  .dg-la { fill: var(--accent); font-size: 11.5px; font-style: italic; }
+  .dg-line { stroke: var(--ink-3); stroke-width: 1.4; fill: none; }
+  .dg-dash { stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 5 4; fill: none; }
+  .dg-head { fill: var(--ink-3); }
+  .dg-head2 { fill: var(--accent); }
+  .scroll-hint { display: none; font-size: 12.5px; color: var(--ink-3); margin: 0 6px 8px; }
+  @media (max-width: 720px) { .scroll-hint { display: block; } }
+
+  .pipeline { display: flex; flex-direction: column; margin: 24px 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); }
+  .pipe-step { display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; }
+  .pipe-step + .pipe-step { border-top: 1px solid var(--line); }
+  .pipe-num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 12.5px; font-weight: 700; margin-top: 1px; }
+  .pipe-body strong { display: block; font-size: 14.5px; color: var(--ink); margin-bottom: 2px; }
+  .pipe-body span { font-size: 13.5px; color: var(--ink-3); }
+
+  .trimviz { margin: 24px 0; }
+  .trimviz .row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .trimviz .label { width: 96px; flex: none; font-size: 12.5px; color: var(--ink-3); }
+  .trimviz .bar { flex: 1; height: 30px; border-radius: 7px; overflow: hidden; display: flex; border: 1px solid var(--line); }
+  .trimviz .seg-a { background: var(--bg-2); border-right: 1px solid var(--panel); display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: var(--ink-3); }
+  .trimviz .seg-fast { background: var(--accent-soft); border-right: 1px solid var(--panel); display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: var(--accent); font-weight: 600; }
+  .trimviz .seg-slow { background: var(--good-soft); border-right: 1px solid var(--panel); display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: var(--good); font-weight: 600; }
+  .trimviz .seg-fast:last-child, .trimviz .seg-slow:last-child, .trimviz .seg-a:last-child { border-right: none; }
+  .trimviz .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+  .trimviz .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  .stat-line { display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 22px; }
+  .stat { flex: 1; min-width: 140px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 22px; color: var(--accent); letter-spacing: -0.01em; }
+  .stat span { font-size: 12.5px; color: var(--ink-3); }
+
+  details.rough { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 14px 0; }
+  details.rough summary { cursor: pointer; font-weight: 600; font-size: 14.5px; color: var(--ink); }
+  details.rough p { margin-top: 10px; margin-bottom: 0; }
+
+  hr.div { border: none; border-top: 1px solid var(--line); margin: 44px 0; }
+  footer { padding: 40px 0 60px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-3); }
+
+  @media (max-width: 480px) {
+    header.hero { padding: 48px 0 28px; }
+    .card { padding: 18px; }
+    pre { padding: 14px 16px; font-size: 12px; }
+    .arch { padding: 12px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">Case Study · Personal Project</p>
+    <h1>Auto Video Creator</h1>
+    <p class="subtitle">A tool that turns a script or a voice recording into a narrated, animated video — with an agent that directs the scenes, and a capture pipeline that can splice in a real phone screen recording timed to the exact word that describes it.</p>
+    <div class="byline">
+      <span class="avatar">A</span>
+      <span><strong>Aakamsha</strong> · designed, built and written up solo</span>
+    </div>
+    <div class="chips">
+      <span class="chip">Node.js</span>
+      <span class="chip">Remotion + React</span>
+      <span class="chip">Whisper + librosa</span>
+      <span class="chip">Claude Code / Copilot CLI</span>
+      <span class="chip">ffmpeg + scrcpy</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <figure class="wide">
+    <div class="shot"><img src="images/avc-new-video.png" width="1280" height="1420" alt="Auto Video Creator's New Video form: transcript input, voice picker, product capture toggle, look and motion presets, and an agent picker"></div>
+    <figcaption>The whole brief for a video fits on one screen: paste the narration (or upload a take), pick a voice or an Android app to capture, pick a visual style, and go. Everything past this point is automatic, except one deliberate pause.</figcaption>
+  </figure>
+
+  <section>
+    <p class="lede">This is the second tool I built around the same idea as my <a href="../app-doc-generator/">App Doc Generator</a> project: give an agent a narrow, well-defined job, back it with deterministic code wherever correctness actually matters, and never let it be the only thing standing between "probably fine" and what ships. Here the agent's job is different — instead of driving a phone to find and document a feature, it directs a video: it decides how many scenes a piece of narration needs, what each scene should look like, and — optionally — narrates a real walkthrough of an Android app it then goes and performs.</p>
+    <p>I reused the phone-automation backend from that first project almost unchanged (the Appium driver, the UI-tree parsing, the capture primitives), which is its own small case study in why building infrastructure once pays off the second time you need it.</p>
+  </section>
+
+  <section>
+    <h2>The problem with narrated videos</h2>
+    <p>Making a decent explainer or product video by hand is three separate skills. You have to record a clean voiceover, which in practice means several takes, some filler words, a stutter you'll want to cut, and pauses that are either too short or oddly long. You have to turn that narration into visuals, which usually means hand-keyframing slides or motion graphics in something like After Effects, scene by scene, timed by ear. And if you want to show the actual product instead of a mockup, you have to record a screen capture and then manually trim and speed it up until it lines up with what you're saying over it — a genuinely fiddly, frame-counting kind of task.</p>
+    <p>None of those is exotic. Doing all three well, for every video, is what makes narrated video production slow.</p>
+  </section>
+
+  <section>
+    <h2>What it actually does</h2>
+    <div class="pipeline">
+      <div class="pipe-step"><span class="pipe-num">1</span><div class="pipe-body"><strong>Bring the narration</strong><span>Paste a script for a locally generated voice, or upload a recorded take. Voice cloning from a short reference clip is also supported.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">2</span><div class="pipe-body"><strong>Review the audio — this always happens</strong><span>The engine transcribes it, finds likely retakes and dead air, and stops at an editable timeline before anything else is built.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">3</span><div class="pipe-body"><strong>The director writes the scenes</strong><span>An agent reads the cleaned, word-timed narration and lays out a sequence of scenes — titles, bullet points, stat call-outs, comparisons — each anchored to the exact words it covers.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">4</span><div class="pipe-body"><strong>Optional: capture a real app demo</strong><span>If the narration describes actual taps and screens, it performs those steps on a connected Android device and splices the recording in, timed to the words that describe it.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">5</span><div class="pipe-body"><strong>Render</strong><span>Remotion renders the finished scenes against the final audio track into an MP4.</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture at a glance</h2>
+    <p>One Node process drives the whole thing as a chain of child-process stages, checkpointed to disk so a crash mid-run resumes instead of restarting. There are two ways in (a recording or a generated voice) that both land in the same place: a review gate that always pauses for a human. Past that gate, a single agent call produces the scene plan, an optional device-capture branch runs before rendering, and Remotion turns the result into a video.</p>
+
+    <figure class="wide arch">
+      <p class="scroll-hint">Scroll sideways to see the full diagram →</p>
+      <div class="arch-scroll">
+        <svg viewBox="0 0 960 940" role="img" aria-label="Architecture diagram: the browser UI talks to a Node server that runs the pipeline as child processes. Two audio paths, a recorded take that gets transcribed, has candidate retakes detected and cuts suggested, and a generated voice from a local TTS server, both lead to an audio review gate that always pauses for the user. After the gate, a director stage (an agent run through the Claude Code or Copilot CLI) turns the word-timed transcript into a Motion IR of scenes. If a scene describes a real app action, an optional capture branch plans the steps once with a headless agent, replays the same logged steps while recording the phone screen, and time-warps the clip to match the narration. Everything converges on a Remotion render that produces the final MP4.">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-head"/></marker>
+            <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-head2"/></marker>
+          </defs>
+
+          <rect x="40" y="16" width="880" height="60" rx="10" class="dg-box"/>
+          <text x="60" y="42" class="dg-t">Browser · New video / Review / Projects</text>
+          <text x="60" y="62" class="dg-s">webapp/public/index.html — single-page UI, polls run status</text>
+
+          <line x1="480" y1="76" x2="480" y2="108" class="dg-line" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <text x="492" y="98" class="dg-l">HTTP · status.json polling</text>
+
+          <rect x="40" y="110" width="880" height="46" rx="10" class="dg-hl"/>
+          <text x="60" y="139" class="dg-t">Run orchestrator · webapp/server.mjs — runs each stage as a child process</text>
+
+          <line x1="250" y1="156" x2="250" y2="182" class="dg-line" marker-end="url(#ah)"/>
+          <line x1="710" y1="156" x2="710" y2="182" class="dg-line" marker-end="url(#ah)"/>
+
+          <rect x="60" y="184" width="380" height="90" rx="9" class="dg-box"/>
+          <text x="76" y="210" class="dg-t">Recorded take</text>
+          <text x="76" y="230" class="dg-s">transcribe (Whisper large-v3)</text>
+          <text x="76" y="247" class="dg-s">detect-candidates → suggest-cuts</text>
+          <text x="76" y="264" class="dg-s">4 independent retake/filler/silence detectors</text>
+
+          <rect x="520" y="184" width="380" height="90" rx="9" class="dg-box"/>
+          <text x="536" y="210" class="dg-t">Generate voice (TTS)</text>
+          <text x="536" y="230" class="dg-s">local voicebox server · Kokoro / Chatterbox / Qwen3</text>
+          <text x="536" y="247" class="dg-s">optional voice cloning from a reference clip</text>
+          <text x="536" y="264" class="dg-s">fed back through the SAME transcribe step</text>
+
+          <line x1="250" y1="274" x2="250" y2="300" class="dg-line"/>
+          <line x1="710" y1="274" x2="710" y2="300" class="dg-line"/>
+          <line x1="250" y1="300" x2="710" y2="300" class="dg-line"/>
+          <line x1="480" y1="300" x2="480" y2="322" class="dg-line" marker-end="url(#ah)"/>
+
+          <rect x="200" y="324" width="560" height="52" rx="10" class="dg-hl"/>
+          <text x="480" y="356" class="dg-t" text-anchor="middle">Review gate — ALWAYS pauses for a human</text>
+
+          <line x1="480" y1="376" x2="480" y2="404" class="dg-line" marker-end="url(#ah)"/>
+          <text x="492" y="396" class="dg-l">clean-audio (final) → re-timed transcript</text>
+
+          <rect x="180" y="406" width="600" height="66" rx="10" class="dg-hl"/>
+          <text x="480" y="432" class="dg-t" text-anchor="middle">Director · author-motion-ir.mjs</text>
+          <text x="480" y="452" class="dg-t" text-anchor="middle" style="font-weight:400;font-size:12px">headless Claude Code or Copilot CLI → scene sidecar, assembled into Motion IR</text>
+
+          <line x1="480" y1="472" x2="480" y2="496" class="dg-line" marker-end="url(#ah)"/>
+          <text x="492" y="490" class="dg-l">scenes with word-span anchors</text>
+
+          <rect x="40" y="498" width="880" height="34" rx="8" class="dg-group"/>
+          <text x="480" y="520" class="dg-g" text-anchor="middle">Motion IR — the render input</text>
+
+          <line x1="300" y1="532" x2="300" y2="558" class="dg-dash" marker-end="url(#ah2)"/>
+          <text x="312" y="552" class="dg-la">if a scene narrates real app steps</text>
+          <line x1="660" y1="532" x2="660" y2="884" class="dg-line" marker-end="url(#ah)"/>
+
+          <rect x="140" y="560" width="320" height="210" rx="12" class="dg-group" stroke-dasharray="4 3"/>
+          <text x="156" y="584" class="dg-g">Optional device capture</text>
+
+          <rect x="160" y="596" width="280" height="52" rx="8" class="dg-box"/>
+          <text x="176" y="618" class="dg-t" style="font-size:13px">1 · Plan (not recorded)</text>
+          <text x="176" y="636" class="dg-s">headless agent performs the steps once, every action logged as a replayable primitive</text>
+
+          <line x1="300" y1="648" x2="300" y2="666" class="dg-line" marker-end="url(#ah)"/>
+
+          <rect x="160" y="668" width="280" height="52" rx="8" class="dg-box"/>
+          <text x="176" y="690" class="dg-t" style="font-size:13px">2 · Replay + record</text>
+          <text x="176" y="708" class="dg-s">cold-starts again, replays the SAME primitives, scrcpy records the screen</text>
+
+          <line x1="300" y1="720" x2="300" y2="738" class="dg-line" marker-end="url(#ah)"/>
+
+          <rect x="160" y="740" width="280" height="52" rx="8" class="dg-box"/>
+          <text x="176" y="762" class="dg-t" style="font-size:13px">3 · warp-clip.mjs</text>
+          <text x="176" y="780" class="dg-s">piecewise time-warp: each tap lands on its narrated word</text>
+
+          <line x1="300" y1="792" x2="300" y2="820" class="dg-line"/>
+          <line x1="300" y1="820" x2="660" y2="820" class="dg-line" marker-end="url(#ah)"/>
+          <text x="480" y="812" class="dg-l" text-anchor="middle">clip, keyed by scene id</text>
+
+          <rect x="200" y="886" width="560" height="52" rx="10" class="dg-hl"/>
+          <text x="480" y="918" class="dg-t" text-anchor="middle">Remotion render · video/render.mjs → final.mp4</text>
+        </svg>
+      </div>
+      <figcaption>The dashed box only runs when a scene's narration actually describes on-screen taps. Everything else always renders from motion graphics alone.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Deciding what's a bad take, without trusting any one signal</h2>
+    <p>The audio-cleanup stage doesn't have a single "is this good" detector — it runs four independent, cheap checks and only unions what they find, then hands the result to a human before committing to anything:</p>
+    <ul>
+      <li>a filler-word lexicon match against the transcript ("um", "uh", "like");</li>
+      <li>a repeated-phrase scan over the transcript text itself, for when you visibly restart a sentence;</li>
+      <li>an <em>acoustic</em> repeat detector — MFCC features through a recurrence matrix (the same technique used for finding repeated sections in music) — that catches a phrase spoken twice even when the transcript missed it, because Whisper tends to quietly collapse an immediate repeat into one instance;</li>
+      <li>silence detection on the raw waveform.</li>
+    </ul>
+    <p>That last one exists because of a mistake I made and had to undo. The first version detected silence from the gaps between transcribed words — which sounds reasonable until you realize a transcript has no idea about background noise, breathing, or a long pause the model just didn't transcribe anything for. It found <strong>3.5 seconds</strong> of silence in a stretch of audio that actually had <strong>85.8 seconds</strong> of dead air. Silence detection now runs on the real waveform through ffmpeg, completely independent of what Whisper thinks was said, and the transcript-based version is gone.</p>
+    <p>The cuts aren't deleted outright either. Pauses get compressed to a floor — 0.7 seconds normally, 1.8 seconds at a paragraph break — rather than removed entirely, so the narration keeps a human rhythm instead of sounding like every breath was surgically closed up. All of this lands on one editable timeline (waveform, color-coded by why each cut was suggested, keyboard shortcuts for split/mark/undo) before a single frame of video gets made.</p>
+  </section>
+
+  <section>
+    <h2>Teaching an agent to direct, not just write</h2>
+    <p>The scene-planning stage is a real agent call — a headless Claude Code or Copilot CLI process, not a template. It gets the narration as a <em>numbered</em> list of words ("14:whenever 15:you 16:tap...") and a catalog of fourteen scene types (title cards, bullet lists, stat call-outs, comparisons, a dedicated "feature showcase" type for app walkthroughs, and so on), each with its own content shape and guidance on when to use it. Its job is to lay out scenes as spans over that word list — "scene 3 covers words 22 through 31" — and pick a motif and a rough content sketch for each one.</p>
+    <p>The part I'm most satisfied with is what the agent is <em>not</em> trusted to do: write the final on-screen copy. Once it proposes a span, the actual text for that scene is pulled verbatim from those exact transcript words by ordinary code, not taken from whatever the model typed. That closes off an entire category of bug — a scene's on-screen text can never say something the narration didn't, because it's assembled from the audio's own transcript, not from the model's memory of it. The agent decides structure and pacing; the code guarantees correctness. It's the same split I leaned on in the documentation agent: let the model make judgment calls, never let it be the source of truth for anything that has to be exactly right.</p>
+    <p>A real scene from the example script looks like this — note the word-span anchors instead of timestamps, so timing is a lookup into the transcript rather than a guess:</p>
+    <pre><code>{
+  "id": "s2",
+  "motif": "bullets",
+  "span": { "w0": 9, "w1": 23 },
+  "content": {
+    "heading": { "text": "Build understanding step by step" },
+    "items": [
+      { "text": "Choose one message", "icon": "target", "at": { "w0": 9, "w1": 11 } },
+      { "text": "Break it into small steps", "icon": "list", "at": { "w0": 12, "w1": 16 } }
+    ]
+  }
+}</code></pre>
+    <p class="caption">Every span indexes the same word-timed transcript, so a scene and its bullets know exactly which seconds of audio they belong to.</p>
+    <p>The prompt also has to tell the agent when <em>not</em> to reach for a demo scene: "this helps reps see key fields at a glance" is a conceptual claim, not something to film, while "tap Preferences, then Notifications" names a literal action. Getting that distinction right in the prompt, with worked positive and negative examples, mattered more than any of the rendering code.</p>
+  </section>
+
+  <section>
+    <h2>Filming a demo without really filming it</h2>
+    <div class="stat-line">
+      <div class="stat"><b>217s</b><span>raw footage from a live agent run</span></div>
+      <div class="stat"><b>19s</b><span>what the narration slot actually needed</span></div>
+    </div>
+    <p>The first version of app capture just let the agent drive the phone live, screen recording on. It does not work: an agent reasoning about each tap in real time is slow and hesitant on camera, and a smoke test once recorded 217 seconds of footage for a 19-second slot. Waiting for a language model to think is not a demo — it's dead air with a cursor blinking.</p>
+    <p>The fix is to never film the thinking. Capture happens in two passes on the same cold-started app state. In the <strong>plan</strong> pass, nothing is recorded: a headless agent works out how to perform the steps, and every real action it takes — a tap, some typed text, a swipe — is logged as a small, replayable instruction, not just narrated in prose. In the <strong>replay</strong> pass, the app is reset to the exact same starting screen and the logged instructions are played back mechanically, at a fixed, brisk pace, with the screen recording on the whole time via scrcpy. There's no reasoning left to be slow — it's just executing a script against a UI it already knows will respond the same way, because it's the same app in the same state.</p>
+    <p>That still leaves a clip paced evenly by replay speed, not by how the narration actually describes each step — one sentence might linger on a screen for three seconds, the next might rush past it in one. <code>warp-clip.mjs</code> fixes that by time-warping the clip piecewise: it knows the real timestamp each action fired during replay and the timestamp it's narrated at, and stretches or compresses each segment between those points independently — speeding a section up, slowing another down, and freeze-holding the last frame if a segment needs to last longer than a reasonable slowdown allows.</p>
+    <div class="trimviz">
+      <div class="row">
+        <span class="label">As replayed</span>
+        <div class="bar">
+          <div class="seg-a" style="width:22%">tap</div><div class="seg-a" style="width:26%">type</div><div class="seg-a" style="width:24%">tap</div><div class="seg-a" style="width:28%">tap</div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Warped</span>
+        <div class="bar">
+          <div class="seg-fast" style="width:14%">faster</div><div class="seg-slow" style="width:38%">held</div><div class="seg-fast" style="width:16%">faster</div><div class="seg-slow" style="width:32%">held</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--accent-soft);border:1px solid var(--accent)"></span> sped up to catch up to the narration</span>
+        <span><span class="swatch" style="background:var(--good-soft);border:1px solid var(--good)"></span> slowed or frozen so a step lingers as long as it's being described</span>
+      </div>
+    </div>
+    <p>It's the video equivalent of the word-by-word text reveal every scene already does: a tap on the "more" icon appears on screen at the exact moment the narration says "tap the more icon," not roughly around then.</p>
+  </section>
+
+  <section>
+    <h2>Small details that mattered more than I expected</h2>
+    <ul>
+      <li><strong>Generated voices reuse the real-recording pipeline, not a shortcut around it.</strong> Synthesized audio still gets fed through the same transcribe-and-align steps a recorded take goes through. It sounds redundant — the TTS engine already knows what it said — but it means word-level timing for a generated voice needed zero new code, and both audio sources end up in the exact same shape by the time the director sees them.</li>
+      <li><strong>The older manifest format is derived, not authored twice.</strong> An earlier version of this tool used a simpler HTML-slide renderer with its own manifest format, and the capture pipeline still speaks that format. Rather than asking the agent to produce both, the manifest is now generated mechanically from the Motion IR after the fact — one LLM call, two consumers, and the two formats can't drift out of sync with each other.</li>
+      <li><strong>The phone-frame compositing came from the documentation project almost untouched.</strong> Cropping a screen recording into a bezel image at the right pixel offsets is a small, fiddly problem I'd already solved once. Copying it over — rather than re-deriving the same math — is the actual payoff of having built the first tool.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>The rest of the app</h2>
+    <p>The review gate is a real timeline editor, not a confirmation dialog: a waveform, segments color-coded by why each was flagged (retake, filler, correction, dead air), split and undo with keyboard shortcuts, and a "preview as exported" toggle so what you hear while editing matches what actually ships. Past that, there's a "regenerate" path with two modes — redo everything from scratch, or keep the cleaned audio and transcript and only redo the director and render — so changing the visual style doesn't force re-recording a voiceover that was already fine. And for the older slide renderer, there's an in-browser HTML editor: open the generated composition, hand-edit it, and re-render without re-running the rest of the pipeline.</p>
+  </section>
+
+  <section>
+    <h2>What I'd change</h2>
+    <details class="rough">
+      <summary>An unmatched segment can silently end up with zero duration</summary>
+      <p>The alignment step that maps narration text onto transcript timing does a longest-common-subsequence match; if a segment somehow doesn't match any words at all, it currently falls back to a zero-length span rather than raising a visible error. It's rare, but it should fail loudly instead of producing an instant scene no one asked for.</p>
+    </details>
+    <details class="rough">
+      <summary>The phone-frame geometry is hardcoded, not derived</summary>
+      <p>The pixel offsets that position a captured clip inside its bezel image are constants in the code, marked as "confirmed" rather than computed from the frame asset itself. Swapping in a new device frame means recalculating those by hand instead of it just working.</p>
+    </details>
+    <details class="rough">
+      <summary>Running two renderers is real weight to carry</summary>
+      <p>Remotion is the default and the one I'd point anyone to, but the older HTML/GSAP renderer is still alive because the capture pipeline's manifest format predates the newer one. It works, but it's a second rendering backend I have to keep in my head.</p>
+    </details>
+    <details class="rough">
+      <summary>Capture determinism rests on one assumption I'd like to remove</summary>
+      <p>The plan and replay passes only produce the same result because the app is force-stopped and relaunched to what's assumed to be the identical starting screen both times. That's true for most apps in practice, but it's an assumption, not a guarantee, and it's the one part of the capture pipeline I'd trust least under a strange edge case.</p>
+    </details>
+  </section>
+
+  <hr class="div">
+
+  <section>
+    <h2>What building this taught me</h2>
+    <p>The instinct going in was that the interesting problem would be the rendering — getting motion graphics to look good. It didn't turn out that way. The genuinely hard parts were both about <em>time</em>: deciding which seconds of a recording deserved to survive, and making a screen recording agree with a sentence about when each thing in it happens. Both got solved the same way — not by making any single step smarter, but by refusing to let one signal, or one model call, be the only thing deciding an outcome that had to be right. Four cheap detectors instead of one clever one. A model that proposes structure, and code that assembles the actual words. A capture pass that plans once and only ever films the boring, deterministic part. None of that is a sophisticated idea. It's just the same lesson from the last project, applied to a very different pipeline.</p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Written by Aakamsha. A personal project, built end to end, reusing the Android capture layer from <a href="../app-doc-generator/">App Doc Generator</a>.
+  </div>
+</footer>
+
+<script>
+if (new URLSearchParams(location.search).has("edit")) {
+  document.designMode = "on";
+  const bar = document.createElement("div");
+  bar.id = "edit-bar";
+  bar.setAttribute("contenteditable", "false");
+  bar.style.cssText = "position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9999;display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#1c1a17;color:#eee7dc;font:13px system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35)";
+  bar.innerHTML = '<span>Editing: click any text to change it</span><button id="edit-save" style="font:inherit;font-weight:600;padding:6px 12px;border:0;border-radius:8px;background:#e08a5f;color:#1c1a17;cursor:pointer">Save</button><span id="edit-status" style="opacity:.75"></span>';
+  document.body.appendChild(bar);
+  const status = bar.querySelector("#edit-status");
+  window.addEventListener("beforeunload", (e) => { if (document.body.dataset.dirty) e.preventDefault(); });
+  document.addEventListener("input", () => { document.body.dataset.dirty = "1"; status.textContent = "unsaved changes"; });
+  bar.querySelector("#edit-save").addEventListener("click", async () => {
+    const root = document.documentElement.cloneNode(true);
+    root.querySelector("#edit-bar")?.remove();
+    root.querySelector("body")?.removeAttribute("data-dirty");
+    const html = "<!doctype html>\n" + root.outerHTML;
+    try {
+      if (window.showSaveFilePicker) {
+        const handle = await showSaveFilePicker({ suggestedName: "index.html", types: [{ description: "HTML", accept: { "text/html": [".html"] } }] });
+        const w = await handle.createWritable();
+        await w.write(html);
+        await w.close();
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+        a.download = "index.html";
+        a.click();
+      }
+      delete document.body.dataset.dirty;
+      status.textContent = "saved";
+    } catch (err) {
+      if (err.name !== "AbortError") status.textContent = "save failed: " + err.message;
+    }
+  });
+}
+</script>
+
+</body>
+</html>
