@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aakamsha — Portfolio</title>
+<meta name="description" content="Projects and case studies by Aakamsha.">
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --bg-2: #f3f1ec;
+    --panel: #ffffff;
+    --ink: #1c1a17;
+    --ink-2: #4a453e;
+    --ink-3: #837c70;
+    --line: #e4e0d7;
+    --accent: #a24d2f;
+    --accent-soft: #f4e5dc;
+    --shadow: 0 1px 2px rgba(28,26,23,.06), 0 12px 32px -12px rgba(28,26,23,.22);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171512;
+      --bg-2: #1e1b17;
+      --panel: #211e19;
+      --ink: #ece7dd;
+      --ink-2: #c3bcae;
+      --ink-3: #8d8577;
+      --line: #35312a;
+      --accent: #e08a5f;
+      --accent-soft: #3a2a20;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px -12px rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+  }
+  img { max-width: 100%; height: auto; display: block; }
+  a { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+
+  header.hero { padding: 76px 0 48px; }
+  .avatar-lg {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-weight: 700; font-size: 24px;
+    margin-bottom: 22px;
+  }
+  h1 { font-size: clamp(30px, 5vw, 42px); line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 12px; }
+  .role { font-size: 15px; color: var(--ink-3); margin: 0 0 20px; }
+  .intro { font-size: 18px; color: var(--ink-2); max-width: 58ch; margin: 0; }
+
+  main { padding: 8px 0 20px; }
+  h2 {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 20px;
+  }
+
+  .project-card {
+    display: block;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 0;
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+    transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
+    margin-bottom: 22px;
+  }
+  .project-card:hover {
+    box-shadow: var(--shadow);
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+    transform: translateY(-1px);
+  }
+  .project-thumb {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 8.2;
+    object-fit: cover;
+    object-position: top;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-2);
+  }
+  .project-body { padding: 22px 24px 24px; }
+  .project-title { font-size: 19px; font-weight: 700; color: var(--ink); margin: 0 0 8px; letter-spacing: -0.005em; }
+  .project-desc { font-size: 15px; color: var(--ink-2); margin: 0 0 16px; text-decoration: none; }
+  .project-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+  .chip { font-size: 12.5px; padding: 5px 10px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink-3); }
+  .project-link { font-size: 14px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }
+  .project-link svg { width: 14px; height: 14px; transition: transform .15s ease; }
+  .project-card:hover .project-link svg { transform: translateX(3px); }
+
+  .empty-note {
+    font-size: 14.5px; color: var(--ink-3);
+    border: 1px dashed var(--line); border-radius: 14px;
+    padding: 20px 22px; margin-top: 4px;
+  }
+
+  footer { padding: 44px 0 60px; border-top: 1px solid var(--line); margin-top: 24px; font-size: 13.5px; color: var(--ink-3); }
+
+  @media (max-width: 480px) {
+    header.hero { padding: 52px 0 36px; }
+    .project-body { padding: 18px 18px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="avatar-lg">A</div>
+    <h1>Aakamsha</h1>
+    <p class="role">Portfolio</p>
+    <p class="intro">I design and build software end to end. Below is a write-up of a recent project — an agent that documents Android apps by actually using them.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <h2>Projects</h2>
+
+  <a class="project-card" href="app-doc-generator/">
+    <img class="project-thumb" src="app-doc-generator/images/generated-doc.png" alt="A generated how-to document produced by App Doc Generator">
+    <div class="project-body">
+      <p class="project-title">App Doc Generator</p>
+      <p class="project-desc">An agent that documents Android apps by driving a real emulator — accessibility-tree navigation, a pluggable three-engine architecture, and a content-anchored video pipeline that turns a raw screen recording into a clean demo clip.</p>
+      <div class="project-chips">
+        <span class="chip">Next.js + TypeScript</span>
+        <span class="chip">Python · Appium</span>
+        <span class="chip">Model Context Protocol</span>
+        <span class="chip">ffmpeg pipeline</span>
+      </div>
+      <span class="project-link">Read the case study
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </span>
+    </div>
+  </a>
+
+  <div class="empty-note">More projects go here as they're added.</div>
+</main>
+
+<footer>
+  <div class="wrap">Aakamsha</div>
+</footer>
+
+</body>
+</html>

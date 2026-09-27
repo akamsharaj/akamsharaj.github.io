@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>App Doc Generator — Case Study</title>
+<meta name="description" content="How I built an agent that documents Android apps by actually using them — accessibility-tree navigation, a pluggable three-engine architecture, and a content-anchored video pipeline.">
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --bg-2: #f3f1ec;
+    --panel: #ffffff;
+    --ink: #1c1a17;
+    --ink-2: #4a453e;
+    --ink-3: #837c70;
+    --line: #e4e0d7;
+    --accent: #a24d2f;
+    --accent-soft: #f4e5dc;
+    --code-bg: #1e1c19;
+    --code-ink: #eee7dc;
+    --good: #3d6b4f;
+    --good-soft: #e4efe6;
+    --shadow: 0 1px 2px rgba(28,26,23,.06), 0 12px 32px -12px rgba(28,26,23,.22);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171512;
+      --bg-2: #1e1b17;
+      --panel: #211e19;
+      --ink: #ece7dd;
+      --ink-2: #c3bcae;
+      --ink-3: #8d8577;
+      --line: #35312a;
+      --accent: #e08a5f;
+      --accent-soft: #3a2a20;
+      --code-bg: #0f0e0c;
+      --code-ink: #e9e2d6;
+      --good: #7fbf94;
+      --good-soft: #1f2c22;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px -12px rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  img { max-width: 100%; height: auto; display: block; }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+  header.hero { padding: 72px 0 40px; }
+  .kicker { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 14px; }
+  .subtitle { font-size: 18px; color: var(--ink-2); max-width: 58ch; margin: 0 0 28px; }
+  .byline { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-3); }
+  .byline .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .byline strong { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 30px 0 0; }
+  .chip { font-size: 13px; padding: 7px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--ink-2); }
+
+  main { padding: 8px 0 20px; }
+  section { margin-bottom: 56px; }
+
+  h2 { font-size: 23px; letter-spacing: -0.005em; margin: 0 0 16px; padding-top: 4px; }
+  p { margin: 0 0 16px; color: var(--ink-2); font-size: 16px; }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+  a { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
+  ul { margin: 0 0 16px; padding-left: 22px; color: var(--ink-2); }
+  li { margin-bottom: 9px; font-size: 16px; }
+  li::marker { color: var(--ink-3); }
+  .lede { font-size: 18.5px; color: var(--ink); }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 20px 0; }
+  .card h4 { margin: 0 0 6px; font-size: 14.5px; color: var(--ink); }
+  .card p:last-child { margin-bottom: 0; }
+
+  code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+  code { background: var(--bg-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 5px; font-size: 0.87em; color: var(--ink); }
+  pre { background: var(--code-bg); color: var(--code-ink); padding: 18px 20px; border-radius: 12px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 18px 0; }
+  pre code { background: none; border: none; padding: 0; color: inherit; }
+  .caption, figcaption { font-size: 13px; color: var(--ink-3); line-height: 1.5; }
+  .caption { margin-top: -10px; margin-bottom: 20px; }
+
+  /* screenshots */
+  figure { margin: 30px 0 34px; }
+  figure.wide {
+    width: min(1040px, calc(100vw - 40px));
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .shot {
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    background: #0b0b0d;
+  }
+  figcaption { margin-top: 12px; max-width: 720px; }
+  figure.wide figcaption { margin-left: auto; margin-right: auto; padding: 0 0; }
+  .shot-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 760px) { .shot-pair { grid-template-columns: 1fr; } }
+  .shot-tall { max-height: 820px; overflow: hidden; position: relative; }
+  .shot-tall::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 90px; background: linear-gradient(transparent, #0b0b0d); }
+
+  /* architecture diagram */
+  .arch { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 14px; }
+  .arch-scroll { overflow-x: auto; }
+  .arch svg { display: block; width: 100%; min-width: 680px; height: auto; }
+  .scroll-hint { display: none; font-size: 12.5px; color: var(--ink-3); margin: 0 6px 8px; }
+  @media (max-width: 720px) { .scroll-hint { display: block; } }
+  .arch text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif; }
+  .dg-box { fill: var(--panel); stroke: var(--line); stroke-width: 1.3; }
+  .dg-group { fill: var(--bg-2); stroke: var(--line); stroke-width: 1.3; }
+  .dg-hl { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.3; }
+  .dg-t { fill: var(--ink); font-size: 15px; font-weight: 600; }
+  .dg-g { fill: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  .dg-s { fill: var(--ink-3); font-size: 12px; }
+  .dg-l { fill: var(--ink-3); font-size: 11.5px; font-style: italic; }
+  .dg-la { fill: var(--accent); font-size: 11.5px; font-style: italic; }
+  .dg-line { stroke: var(--ink-3); stroke-width: 1.4; fill: none; }
+  .dg-dash { stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 5 4; fill: none; }
+  .dg-head { fill: var(--ink-3); }
+  .dg-head2 { fill: var(--accent); }
+
+  /* numbered flow */
+  .pipeline { display: flex; flex-direction: column; margin: 24px 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); }
+  .pipe-step { display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; }
+  .pipe-step + .pipe-step { border-top: 1px solid var(--line); }
+  .pipe-num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 12.5px; font-weight: 700; margin-top: 1px; }
+  .pipe-body strong { display: block; font-size: 14.5px; color: var(--ink); margin-bottom: 2px; }
+  .pipe-body span { font-size: 13.5px; color: var(--ink-3); }
+
+  /* trim visual */
+  .trimviz { margin: 24px 0; }
+  .trimviz .row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .trimviz .label { width: 84px; flex: none; font-size: 12.5px; color: var(--ink-3); }
+  .trimviz .bar { flex: 1; height: 26px; border-radius: 7px; overflow: hidden; display: flex; border: 1px solid var(--line); }
+  .trimviz .seg-cut { background: repeating-linear-gradient(45deg, var(--bg-2), var(--bg-2) 5px, var(--line) 5px, var(--line) 10px); }
+  .trimviz .seg-keep { background: var(--good-soft); border-left: 2px solid var(--good); border-right: 2px solid var(--good); }
+  .trimviz .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+  .trimviz .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+  .cols .card { margin: 0; }
+  .cols .bad h4 { color: #b0503c; }
+  .cols .good h4 { color: var(--good); }
+  @media (max-width: 620px) { .cols { grid-template-columns: 1fr; } }
+
+  details.rough { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 14px 0; }
+  details.rough summary { cursor: pointer; font-weight: 600; font-size: 14.5px; color: var(--ink); }
+  details.rough p { margin-top: 10px; margin-bottom: 0; }
+
+  hr.div { border: none; border-top: 1px solid var(--line); margin: 44px 0; }
+  footer { padding: 40px 0 60px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-3); }
+
+  @media (max-width: 480px) {
+    header.hero { padding: 48px 0 28px; }
+    .card { padding: 18px; }
+    pre { padding: 14px 16px; font-size: 12px; }
+    .arch { padding: 12px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">Case Study · Personal Project</p>
+    <h1>App Doc Generator</h1>
+    <p class="subtitle">An agent that learns an Android app by actually tapping through it, then writes the help-center article itself, with screenshots and demo videos.</p>
+    <div class="byline">
+      <span class="avatar">A</span>
+      <span><strong>Aakamsha</strong> · designed, built and written up solo</span>
+    </div>
+    <div class="chips">
+      <span class="chip">Next.js + TypeScript</span>
+      <span class="chip">Python · Appium</span>
+      <span class="chip">Model Context Protocol</span>
+      <span class="chip">SQLite (FTS5)</span>
+      <span class="chip">ffmpeg pipeline</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <figure class="wide">
+    <div class="shot"><img src="images/dashboard.png" width="1440" height="900" alt="App Doc Generator dashboard showing projects, published docs, recent runs with engine and cost, and connected devices"></div>
+    <figcaption>The home dashboard. Every row under "Recent activity" is a real documentation run, tagged with the engine that drove it and what it cost.</figcaption>
+  </figure>
+
+  <section>
+    <p class="lede">Most "AI documentation" tools summarize a document you already wrote. This one starts from a running app instead. You give it a feature name and a sentence of instructions. It opens an Android emulator, finds the feature on its own, performs it for real, records a clean demo clip as it goes, and comes back with a formatted how-to article ready to publish.</p>
+    <p>I built it because I was tired of watching documentation rot. Every time an app shipped an update, some screenshot somewhere was suddenly wrong, and nobody noticed until a user complained. The project started as a question: can an agent drive a real app reliably enough that I'd trust what it writes? It turned into a full web app I actually use.</p>
+  </section>
+
+  <section>
+    <h2>The problem with documenting an app by hand</h2>
+    <p>Writing a how-to article for a mobile feature is three jobs stacked on top of each other. First you perform the flow yourself, carefully, so you don't miss a step. Then you write it up in plain, consistent language. That's more tedious than it sounds, because "tap the field and enter your company name" needs to become "fill in the required details", or the doc is wrong the moment someone's account has different custom fields. Then, if you want a demo video (and you should, because screenshots alone are a worse experience), you do the whole thing again on camera. Fat-finger one tap near the end and you re-record the clip from scratch.</p>
+    <p>None of those jobs is hard on its own. Doing all three, correctly, for every feature, every release, is what doesn't scale. That's why documentation is usually the first thing to fall behind.</p>
+  </section>
+
+  <section>
+    <h2>What it actually does</h2>
+    <p>From the outside, using it looks like this:</p>
+    <div class="pipeline">
+      <div class="pipe-step"><span class="pipe-num">1</span><div class="pipe-body"><strong>Point it at an app</strong><span>Pick an app installed on a running emulator, or on a real phone over USB.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">2</span><div class="pipe-body"><strong>Describe one feature</strong><span>A name and a sentence, like "Document creating a new lead, starting from the home screen." No screen-by-screen script.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">3</span><div class="pipe-body"><strong>Pick what drives it</strong><span>Your own API key, or an existing Claude Code or GitHub Copilot subscription. Same behavior either way.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">4</span><div class="pipe-body"><strong>Watch it happen live</strong><span>A live panel streams every tap, typed field and screenshot over a WebSocket as it happens. You can see exactly what it's doing and cancel at any point.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">5</span><div class="pipe-body"><strong>Get back a real document</strong><span>Introduction, prerequisites, one section per action it found, numbered steps, a cover image and short demo clips, already trimmed and placed in a phone frame.</span></div></div>
+      <div class="pipe-step"><span class="pipe-num">6</span><div class="pipe-body"><strong>Review and ship</strong><span>Annotate a screenshot, re-cut a video by hand if the auto-trim guessed wrong, then export a self-contained HTML page or a Markdown-plus-media zip.</span></div></div>
+    </div>
+
+    <figure class="wide">
+      <div class="shot-pair">
+        <div class="shot"><img src="images/new-project.png" width="1440" height="640" loading="lazy" alt="New project wizard: choose a device, then an installed app"></div>
+        <div class="shot"><img src="images/add-feature.png" width="1440" height="900" loading="lazy" alt="Add a feature form with document types: how-to guide, UI overview, revamp and video capture"></div>
+      </div>
+      <figcaption>Left: a project starts by picking a device and an installed app. Right: each feature is a name, a doc type and optional instructions. The four doc types cover a fresh how-to, a screen overview, rebuilding an outdated doc, and adding videos to a doc someone already wrote.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Architecture at a glance</h2>
+    <p>There are two halves. A Node server owns everything the user sees: projects, prompts, the knowledge base, the video pipeline. A small Python server owns the phone. Between them sits one of three interchangeable agent "engines", and the only thing any engine talks to on the phone side is a fixed set of MCP tools.</p>
+
+    <figure class="wide arch">
+      <p class="scroll-hint">Scroll sideways to see the full diagram →</p>
+      <div class="arch-scroll">
+        <svg viewBox="0 0 960 740" role="img" aria-label="Architecture diagram: the browser UI talks to a Node server over HTTP and WebSocket. The Node server contains the run orchestrator, prompt builder, project store, knowledge base and video pipeline. The orchestrator starts one of three engines: ApiRunner, which calls an LLM API directly, the Claude Code CLI, or the GitHub Copilot CLI. Every engine drives the same Python MCP server over stdio. The MCP server calls back to the knowledge base for search_kb, hands raw clips to the video pipeline, and controls the Android emulator or phone through Appium and adb.">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-head"/></marker>
+            <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-head2"/></marker>
+          </defs>
+
+          <!-- Browser -->
+          <rect x="40" y="16" width="880" height="66" rx="10" class="dg-box"/>
+          <text x="60" y="44" class="dg-t">Browser · Next.js UI</text>
+          <text x="60" y="66" class="dg-s">Dashboard · live run view · doc editor · screenshot annotator · video trim editor</text>
+
+          <line x1="480" y1="84" x2="480" y2="122" class="dg-line" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <text x="492" y="108" class="dg-l">HTTP + WebSocket (live run events)</text>
+
+          <!-- Node server -->
+          <rect x="40" y="124" width="880" height="232" rx="12" class="dg-group"/>
+          <text x="60" y="150" class="dg-g">Node server · Next.js + ws (server.ts)</text>
+
+          <rect x="60" y="166" width="260" height="70" rx="9" class="dg-hl"/>
+          <text x="76" y="193" class="dg-t">Run orchestrator</text>
+          <text x="76" y="215" class="dg-s">runner.ts · one run at a time · caps</text>
+
+          <rect x="340" y="166" width="260" height="70" rx="9" class="dg-box"/>
+          <text x="356" y="193" class="dg-t">Prompt builder</text>
+          <text x="356" y="215" class="dg-s">prompt.ts · style guides · writing rules</text>
+
+          <rect x="620" y="166" width="280" height="70" rx="9" class="dg-box"/>
+          <text x="636" y="193" class="dg-t">Project store</text>
+          <text x="636" y="215" class="dg-s">SQLite · runs · doc versions · media</text>
+
+          <rect x="60" y="256" width="400" height="80" rx="9" class="dg-box"/>
+          <text x="76" y="283" class="dg-t">Knowledge base</text>
+          <text x="76" y="305" class="dg-s">SQLite FTS5 search over help articles</text>
+          <text x="76" y="322" class="dg-s">injected into prompts + served at /api/kb/search</text>
+
+          <rect x="480" y="256" width="420" height="80" rx="9" class="dg-box"/>
+          <text x="496" y="283" class="dg-t">Video pipeline</text>
+          <text x="496" y="305" class="dg-s">content-anchored trim · crop · phone frame</text>
+          <text x="496" y="322" class="dg-s">ffmpeg · QC status · manual trim editor</text>
+
+          <!-- fan-out to engines -->
+          <line x1="480" y1="356" x2="480" y2="384" class="dg-line"/>
+          <line x1="350" y1="384" x2="812" y2="384" class="dg-line"/>
+          <line x1="350" y1="384" x2="350" y2="408" class="dg-line" marker-end="url(#ah)"/>
+          <line x1="577" y1="384" x2="577" y2="408" class="dg-line" marker-end="url(#ah)"/>
+          <line x1="812" y1="384" x2="812" y2="408" class="dg-line" marker-end="url(#ah)"/>
+          <text x="490" y="376" class="dg-l">starts one engine per run</text>
+
+          <!-- Engines -->
+          <rect x="40" y="410" width="180" height="72" rx="9" class="dg-box" stroke-dasharray="4 3"/>
+          <text x="56" y="438" class="dg-t">LLM API</text>
+          <text x="56" y="459" class="dg-s">Anthropic or</text>
+          <text x="56" y="474" class="dg-s">OpenAI-compatible</text>
+
+          <line x1="222" y1="446" x2="248" y2="446" class="dg-line" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+          <rect x="250" y="410" width="200" height="72" rx="9" class="dg-hl"/>
+          <text x="266" y="438" class="dg-t">ApiRunner</text>
+          <text x="266" y="459" class="dg-s">TypeScript agent loop</text>
+          <text x="266" y="474" class="dg-s">bring your own key</text>
+
+          <rect x="470" y="410" width="215" height="72" rx="9" class="dg-box"/>
+          <text x="486" y="438" class="dg-t">Claude Code CLI</text>
+          <text x="486" y="459" class="dg-s">runs on a subscription</text>
+
+          <rect x="705" y="410" width="215" height="72" rx="9" class="dg-box"/>
+          <text x="721" y="438" class="dg-t">GitHub Copilot CLI</text>
+          <text x="721" y="459" class="dg-s">runs on a subscription</text>
+
+          <!-- engines to MCP -->
+          <line x1="350" y1="482" x2="350" y2="530" class="dg-line" marker-end="url(#ah)"/>
+          <line x1="577" y1="482" x2="577" y2="530" class="dg-line" marker-end="url(#ah)"/>
+          <line x1="812" y1="482" x2="812" y2="530" class="dg-line" marker-end="url(#ah)"/>
+          <text x="590" y="512" class="dg-l">MCP over stdio · same tools for every engine</text>
+
+          <!-- MCP server -->
+          <rect x="40" y="532" width="880" height="92" rx="10" class="dg-hl"/>
+          <text x="60" y="560" class="dg-t">MCP server · app-doc-driver (Python)</text>
+          <text x="60" y="583" class="dg-s">tap · type_text · swipe · press_back · screenshot · begin_action / end_action · discard_step · search_kb · done</text>
+          <text x="60" y="603" class="dg-s">accessibility tree → numbered element list · status-bar demo mode · settled-frame anchors for trimming</text>
+
+          <!-- side channels -->
+          <path d="M40,590 H22 V296 H58" class="dg-dash" marker-end="url(#ah2)"/>
+          <text x="14" y="445" class="dg-la" text-anchor="middle" transform="rotate(-90 14 445)">search_kb (HTTP)</text>
+          <path d="M920,590 H940 V296 H902" class="dg-dash" marker-end="url(#ah2)"/>
+          <text x="952" y="445" class="dg-la" text-anchor="middle" transform="rotate(90 952 445)">raw clips + timing sidecars</text>
+
+          <!-- device side -->
+          <line x1="240" y1="624" x2="240" y2="660" class="dg-line" marker-end="url(#ah)"/>
+          <text x="252" y="647" class="dg-l">WebDriver</text>
+
+          <rect x="40" y="662" width="400" height="62" rx="9" class="dg-box"/>
+          <text x="56" y="688" class="dg-t">Appium + adb</text>
+          <text x="56" y="709" class="dg-s">UI tree XML · gestures · screen recording</text>
+
+          <line x1="442" y1="693" x2="518" y2="693" class="dg-line" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+          <rect x="520" y="662" width="400" height="62" rx="9" class="dg-box"/>
+          <text x="536" y="688" class="dg-t">Android emulator or USB phone</text>
+          <text x="536" y="709" class="dg-s">any installed app, no source code needed</text>
+        </svg>
+      </div>
+      <figcaption>Highlighted boxes are the pieces I'd call the core: the orchestrator, the in-house agent loop, and the MCP server. The dashed lines are the two side channels the phone side uses to reach back into the Node server.</figcaption>
+    </figure>
+
+    <p>A run goes top to bottom. The orchestrator builds one prompt (feature, instructions, style guide, knowledge-base snippets, writing rules) and hands it to whichever engine the user picked. The engine loops: read the screen, call one tool, read the result, repeat until it calls <code>done()</code>. Screenshots and raw clips land in a per-run folder. After the run, the video pipeline turns the clips into finished videos, and the Markdown gets rendered with its media markers resolved and saved as a new doc version, so older versions can always be restored.</p>
+  </section>
+
+  <section>
+    <h2>The core idea: read the tree, not the pixels</h2>
+    <p>A lot of "AI controls an app" demos show a vision model a screenshot and ask it to guess pixel coordinates to tap. It looks great in a GIF and is unreliable in practice. Screen density varies across devices, a button moves eight pixels between versions, and estimating the exact center of a small icon from a picture is something vision models are still shaky at.</p>
+    <p>So this doesn't do that. Android exposes an accessibility tree for every screen, the same data screen readers use, and Appium can hand it over as XML. I parse it, drop everything that isn't visible, tappable or carrying meaningful text, and compact what's left into a short numbered list:</p>
+    <pre><code>[ 12] Button        "Save"          id=action_save   bounds=(900,80,1060,160) clickable
+[ 27] EditText      "Company"       id=company_input bounds=(80,320,1000,400) input
+[ 31] ImageView     ""              id=fab_add       bounds=(940,1780,1060,1900) clickable</code></pre>
+    <p class="caption">A trimmed example of the compact tree the agent actually reasons over.</p>
+    <p>The model just says "tap 12". No coordinate math, no guessed pixels. Every gesture tool (tap, type, swipe) returns the refreshed tree in its own response, so the agent never spends a turn re-reading the screen after acting. IDs only belong to the tree they came from, so a stale ID can't quietly tap the wrong thing three screens later.</p>
+    <p>It isn't pixel-free everywhere. Some Jetpack Compose icons render with no label, description or resource ID at all, so there's a coordinate fallback for those. The prompt is explicit that it's a last resort, and in a normal app the tree covers almost everything.</p>
+  </section>
+
+  <section>
+    <h2>One tool surface, three brains</h2>
+    <p>The phone is controlled through a small local server that exposes tap, type_text, swipe, press_back, screenshot, begin_action/end_action for recording, and done as tools over the <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol</a>, on top of Appium. That server doesn't know or care which model is calling it.</p>
+    <p>There are three ways to drive it. The first is a TypeScript agent loop I wrote that talks straight to an Anthropic or OpenAI-compatible API with native tool calling, so anyone with an API key can use it. The other two spawn the Claude Code CLI or the GitHub Copilot CLI, which already speak MCP and bill through whatever subscription the person already has.</p>
+
+    <figure class="wide">
+      <div class="shot-pair">
+        <div class="shot"><img src="images/settings-engine.png" width="1440" height="640" loading="lazy" alt="Settings page with three AI engine options: API, Claude Code CLI and Copilot CLI, plus emulator and Appium controls"></div>
+        <div class="shot"><img src="images/runs.png" width="1440" height="620" loading="lazy" alt="Runs tab for the Stopwatch feature listing two API runs and one Claude run with their costs"></div>
+      </div>
+      <figcaption>Left: the engine is a setting, and can also be switched per run. Right: the same Stopwatch feature documented three times, twice through the API engine and once through Claude Code, with the cost of each run.</figcaption>
+    </figure>
+
+    <p>That was a deliberate call. I didn't want the project to live or die by one vendor's agent harness or pricing. The prompt and the tools are identical whichever engine is driving; only the outer loop changes. It also turned out to be a useful debugging trick. Running the same instructions through all three shows you exactly where the models make different judgment calls, which you'd never see building against just one.</p>
+  </section>
+
+  <section>
+    <h2>The tapping turned out to be the easy part</h2>
+    <p>Getting the agent to find and perform a feature took real iteration, but it came together faster than I expected. Getting it to write documentation that reads like a technical writer published it, rather than a transcript of button-mashing, took a lot longer. Most of that work lives in the prompt, not the code.</p>
+    <p>The clearest example is what I ended up calling the universal-steps problem. To record a good demo, the agent has to fill in real forms with realistic data: every visible field, a real-sounding name, a plausible address. Left alone, it then writes that up literally. Tap Company, type the company name, tap the back arrow, enter First Name, enter Last Name, tap Lead Source, choose an option. It's a faithful record of what happened, and it's useless as documentation, because the next person's account has different custom fields and the steps are wrong on day one.</p>
+    <div class="cols">
+      <div class="card bad">
+        <h4>What it wants to write</h4>
+        <p>Tap the <strong>+</strong> button.<br>Tap <strong>Add Lead</strong>.<br>Tap the <strong>Company</strong> field.<br>Type the company name.<br>Tap the back arrow to confirm.<br>Enter the First Name.<br>Enter the Last Name.<br>Enter the remaining fields.<br>Tap <strong>Lead Source</strong>.<br>Choose an option.<br>Tap <strong>Save</strong>.</p>
+      </div>
+      <div class="card good">
+        <h4>What ships</h4>
+        <p>Tap the <strong>+</strong> button.<br>Tap <strong>Add Lead</strong>.<br>Fill in the required details.<br>Tap <strong>Save</strong>.</p>
+      </div>
+    </div>
+    <p>The fix is a rule, not a smarter model. Filling a form is one step in the text, full stop. The field-by-field detail belongs in the video, where it helps, not in prose that has to stay accurate across accounts and releases. A handful of rules like that did more for the output than any amount of asking for "concise": steps capped at twelve words, one action per step, exact button labels in bold, and never narrating "you will see...".</p>
+
+    <figure class="wide">
+      <div class="shot shot-tall"><img src="images/generated-doc.png" width="1440" height="1640" loading="lazy" alt="A generated how-to article for a feature called Quick Mode, with introduction, prerequisites, a list of possible actions, short imperative steps and a note"></div>
+      <figcaption>A document the agent wrote for "Quick Mode" in an AI character app: a short introduction, the actions it discovered, short imperative steps with bold labels, and a note for the one real caveat. The phone screenshots and clips are left out of this capture.</figcaption>
+    </figure>
+
+    <p>There's a second layer. A lot of mobile features are configured on the web and only used on the phone. A small keyword-search index over existing help articles is queried before a run starts, and the agent can search it mid-run too. That lets it tell "this is new on mobile, describe exactly what I see" apart from "this is set up on the web, so say so and link to it". The prompt is blunt that the live screen always wins if the two disagree.</p>
+  </section>
+
+  <section>
+    <h2>The video pipeline was the hardest engineering problem</h2>
+    <p>The idea is simple: the authoring run <em>is</em> the recording. The agent wraps each action in <code>begin_action()</code> and <code>end_action()</code>, which start and stop a screen recording on the emulator, and whatever it does in between becomes raw footage. There's no separate "now do it again for the camera" pass.</p>
+    <p>The catch is that raw footage is a mess. It includes the model's thinking pauses between tool calls and any wrong taps it recovered from, and it runs far longer than the action takes. The obvious fix is to timestamp each tap relative to when recording started and cut the clip to those times. I tried that first. It doesn't work, because the recorder's clock and the actual video timeline drift apart (encoder warm-up, variable frame rate). Trust the clock and you cut into the previous action, or freeze on a half-loaded spinner.</p>
+    <p>What works is anchoring by content instead of by clock. After each gesture settles, the tool server saves a screenshot of the settled screen plus a small fingerprint of its UI tree. When the raw clip is processed later, image matching finds the frame in the video where that settled screen actually appears, and the keep-window is built around that frame rather than a guessed time. Clock drift can't affect it, because it never looks at the clock; it looks at what's on screen. When nothing matches cleanly (an old run with no settled shots, or genuinely ambiguous frames), it falls back to the time-based cut and flags the clip for review instead of quietly shipping a bad one.</p>
+    <div class="trimviz">
+      <div class="row">
+        <span class="label">Raw clip</span>
+        <div class="bar">
+          <div class="seg-cut" style="width:14%"></div><div class="seg-keep" style="width:20%"></div><div class="seg-cut" style="width:22%"></div><div class="seg-keep" style="width:16%"></div><div class="seg-cut" style="width:10%"></div><div class="seg-keep" style="width:18%"></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Trimmed</span>
+        <div class="bar">
+          <div class="seg-keep" style="width:37%"></div><div class="seg-keep" style="width:30%"></div><div class="seg-keep" style="width:33%"></div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--good-soft);border:1px solid var(--good)"></span> kept, anchored to a real settled frame</span>
+        <span><span class="swatch" style="background:var(--line)"></span> cut: thinking gaps, retries, dead air</span>
+      </div>
+    </div>
+    <p>A few more layers sit on top. <code>discard_step</code> lets the agent mark its own mistakes, a wrong tap and the Back press used to undo it, so they're removed from the video entirely. An optional vision-model check looks at each clip's last frame and asks whether the screen has actually finished loading, and extends the clip if it hasn't. Every clip also carries a status of auto_ok, needs_review or edited, because I don't trust any single heuristic, mine included, to be right every time. For the cases it gets wrong, the web app has a non-destructive timeline editor: scrub, split, drag a boundary, save, and it re-renders from your edits without ever touching the raw clip.</p>
+  </section>
+
+  <section>
+    <h2>Small details that mattered more than I expected</h2>
+    <p>Some problems only showed up once I was watching real footage, and each needed its own fix.</p>
+    <ul>
+      <li><strong>Duplicate touch ripples.</strong> Tapping a text field and then typing into it are two tool calls, but visually one tap. Without deduping, the video showed two overlapping ripples on the same spot. The fix is a simple window: a second touch within 40 pixels and 1.5 seconds of the last one doesn't get its own ripple.</li>
+      <li><strong>The status bar leaked the real time.</strong> Android's demo mode can freeze the clock at 12:30 and hide notification icons, which matters more than it sounds: a screenshot with today's time and a stray notification badge looks sloppy and dates itself. The trickier part was that Android quietly drops that state during a long run, so it gets re-applied right before every recording, not just once at startup.</li>
+      <li><strong>Crash recovery.</strong> If the server restarts mid-run, it finds any run still marked "in progress" and resolves it on boot, instead of leaving the UI watching a run that will never finish.</li>
+      <li><strong>Cost estimates close to the real bill.</strong> The live cost counter prices cached prompt reads and writes separately from normal tokens. A cache read costs roughly a tenth of a fresh one, so ignoring that would throw every estimate off noticeably on a long run.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>The rest of the app</h2>
+    <p>Under the agent it's a real web app, not a script with a UI bolted on. Next.js runs behind a custom server so WebSocket and HTTP traffic share one process. Projects and features are SQLite rows, and every generated document is saved as a new version you can roll back to. The live run view streams every thought, tool call and screenshot as it happens, and asks "still going?" if a run runs long, so nothing burns through a budget unnoticed. There's a Fabric.js screenshot annotator for redacting or highlighting before publishing, per-project style guides that set tone and feed reference examples into the same prompt every engine gets, and export to a single self-contained HTML file or a Markdown-plus-media zip, depending on where the doc needs to live.</p>
+  </section>
+
+  <section>
+    <h2>What I'd change</h2>
+    <p>A few things are still rough, and I'd rather say so than pretend otherwise.</p>
+    <details class="rough">
+      <summary>The clock-drift problem is really a symptom of the recorder I chose</summary>
+      <p>Content-anchored trimming works around the emulator's built-in recorder drifting from real time. There's an experimental host-side recorder (scrcpy) that gives noticeably smoother footage, but it only emits frames when the screen changes, which breaks the anchoring assumptions in a different way. It's still in there, opt-in and off by default, and honestly unsolved.</p>
+    </details>
+    <details class="rough">
+      <summary>The three engines don't explore identically</summary>
+      <p>Same prompt, same tools, but different models make different calls about how thoroughly to explore before deciding a feature is covered. I haven't closed that gap, and I'm not sure it can be closed completely without giving up the point of supporting more than one engine.</p>
+    </details>
+    <details class="rough">
+      <summary>Error handling leans on "log it and keep going" more than I'd like</summary>
+      <p>It's built to run unattended for twenty minutes or more, so a lot of non-critical steps (a failed screenshot, a demo-mode command that didn't stick) are best-effort rather than fatal. That's the right call for keeping a long run alive, but it also means some failures are quieter than I'd want in something other people depend on.</p>
+    </details>
+  </section>
+
+  <hr class="div">
+
+  <section>
+    <h2>What building this taught me</h2>
+    <p>Going in, I assumed the hard part would be the agent: getting a model to navigate a UI it had never seen. That came together faster than I expected, mostly because reading the accessibility tree instead of guessing at pixels removes most of the fragility up front. What actually took the time was everything after "the agent found the right screen": writing prose that stays true a release later, and turning a recording full of hesitations and mistakes into something that looks intentional. Neither of those is a model-capability problem. They're editorial and engineering problems that happen to have an LLM in the middle, and treating them that way, with explicit rules, fallbacks and a human review step instead of blind trust in the automation, is what made the output usable.</p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Written by Aakamsha. A personal project, built end to end, from the Android automation layer up to the documentation review UI.
+  </div>
+</footer>
+
+<script>
+// Edit mode: open this page with ?edit in the URL to change text in place and save.
+if (new URLSearchParams(location.search).has("edit")) {
+  document.designMode = "on";
+  const bar = document.createElement("div");
+  bar.id = "edit-bar";
+  bar.setAttribute("contenteditable", "false");
+  bar.style.cssText = "position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9999;display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#1c1a17;color:#eee7dc;font:13px system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35)";
+  bar.innerHTML = '<span>Editing: click any text to change it</span><button id="edit-save" style="font:inherit;font-weight:600;padding:6px 12px;border:0;border-radius:8px;background:#e08a5f;color:#1c1a17;cursor:pointer">Save</button><span id="edit-status" style="opacity:.75"></span>';
+  document.body.appendChild(bar);
+  const status = bar.querySelector("#edit-status");
+  window.addEventListener("beforeunload", (e) => { if (document.body.dataset.dirty) e.preventDefault(); });
+  document.addEventListener("input", () => { document.body.dataset.dirty = "1"; status.textContent = "unsaved changes"; });
+
+  bar.querySelector("#edit-save").addEventListener("click", async () => {
+    const root = document.documentElement.cloneNode(true);
+    root.querySelector("#edit-bar")?.remove();
+    root.querySelector("body")?.removeAttribute("data-dirty");
+    const html = "<!doctype html>\n" + root.outerHTML;
+    try {
+      if (window.showSaveFilePicker) {
+        const handle = await showSaveFilePicker({ suggestedName: "index.html", types: [{ description: "HTML", accept: { "text/html": [".html"] } }] });
+        const w = await handle.createWritable();
+        await w.write(html);
+        await w.close();
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+        a.download = "index.html";
+        a.click();
+      }
+      delete document.body.dataset.dirty;
+      status.textContent = "saved";
+    } catch (err) {
+      if (err.name !== "AbortError") status.textContent = "save failed: " + err.message;
+    }
+  });
+}
+</script>
+
+</body>
+</html>
